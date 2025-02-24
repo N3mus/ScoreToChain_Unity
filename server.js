@@ -20,9 +20,9 @@ app.use(express.json());
 app.post("/postMatchResults", async (req, res) => {
     console.log("Received request from Unity:", req.body);
 
-    const { address, uuid, amount } = req.body;
+    const { address, gameid, amount } = req.body;
 
-    if (!address || !uuid || !amount) {
+    if (!address || !gameid || !amount) {
         return res.status(400).send({ error: "Missing parameters" });
     }
 
@@ -31,7 +31,7 @@ app.post("/postMatchResults", async (req, res) => {
         const amountInWei = ethers.parseEther(amount.toString());
 
         // Send the transaction directly to the blockchain
-        const tx = await matchScoresContract.setScore(address, uuid, amountInWei);
+        const tx = await matchScoresContract.setScore(address, gameid, amountInWei);
         const receipt = await tx.wait();
 
         if (receipt.status === 1) {
