@@ -8,22 +8,15 @@ public class ScoreUploader : MonoBehaviour
 {
     private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
 
-    public void SubmitScore(string walletAddress, string gameid, float score)
+    public void SubmitScore(Dictionary<string, object> scoreData)
     {
-        StartCoroutine(PostScore(walletAddress, gameid, score));
+        StartCoroutine(PostScore(scoreData));
     }
 
-    private IEnumerator PostScore(string walletAddress, string gameid, float score)
+    private IEnumerator PostScore(Dictionary<string, object> scoreData)
     {
-        // Prepare JSON payload
-        Dictionary<string, string> jsonData = new Dictionary<string, string>
-        {
-            { "address", walletAddress },
-            { "gameid", gameid },
-            { "amount", score.ToString() }
-        };
-
-        string jsonPayload = JsonUtility.ToJson(jsonData);
+        // Convert dictionary to JSON
+        string jsonPayload = JsonUtility.ToJson(new Wrapper(scoreData));
         byte[] postData = Encoding.UTF8.GetBytes(jsonPayload);
 
         using (UnityWebRequest webRequest = new UnityWebRequest(studioApiUrl, "POST"))
@@ -42,6 +35,18 @@ public class ScoreUploader : MonoBehaviour
             {
                 Debug.LogError("Failed to submit score: " + webRequest.error);
             }
+        }
+    }
+
+    // Wrapper class to allow serialization of dictionaries
+    [System.Serializable]
+    private class Wrapper
+    {
+        public Dictionary<string, object> data;
+
+        public Wrapper(Dictionary<string, object> dictionary)
+        {
+            this.data = dictionary;
         }
     }
 }
