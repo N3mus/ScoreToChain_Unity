@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 public class ScoreUploader : MonoBehaviour
 {
-    private string apiUrl = "https://your-backend-url.com/postMatchResults";
+    private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
 
     public void SubmitScore(string walletAddress, string matchUuid, float score)
     {
@@ -15,18 +15,18 @@ public class ScoreUploader : MonoBehaviour
 
     private IEnumerator PostScore(string walletAddress, string matchUuid, float score)
     {
-        // Convert the score to a JSON payload
+        // Prepare JSON payload
         Dictionary<string, string> jsonData = new Dictionary<string, string>
         {
             { "address", walletAddress },
             { "uuid", matchUuid },
-            { "amount", score.ToString() } // Ensure amount is stringified
+            { "amount", score.ToString() }
         };
-        
+
         string jsonPayload = JsonUtility.ToJson(jsonData);
         byte[] postData = Encoding.UTF8.GetBytes(jsonPayload);
 
-        using (UnityWebRequest webRequest = new UnityWebRequest(apiUrl, "POST"))
+        using (UnityWebRequest webRequest = new UnityWebRequest(studioApiUrl, "POST"))
         {
             webRequest.uploadHandler = new UploadHandlerRaw(postData);
             webRequest.downloadHandler = new DownloadHandlerBuffer();
