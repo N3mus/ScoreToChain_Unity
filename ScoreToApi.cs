@@ -8,18 +8,18 @@ public class ScoreUploader : MonoBehaviour
 {
     private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
 
-    public void SubmitScore(string walletAddress, string matchUuid, float score)
+    public void SubmitScore(string walletAddress, string gameid, float score)
     {
-        StartCoroutine(PostScore(walletAddress, matchUuid, score));
+        StartCoroutine(PostScore(walletAddress, gameid, score));
     }
 
-    private IEnumerator PostScore(string walletAddress, string matchUuid, float score)
+    private IEnumerator PostScore(string walletAddress, string gameid, float score)
     {
         // Prepare JSON payload
         Dictionary<string, string> jsonData = new Dictionary<string, string>
         {
             { "address", walletAddress },
-            { "uuid", matchUuid },
+            { "gameid", gameid },
             { "amount", score.ToString() }
         };
 
