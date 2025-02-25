@@ -9,8 +9,17 @@ public class ScoreUploader : MonoBehaviour
 {
     private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
 
-    public void SubmitScore(Dictionary<string, object> matchData)
+    public void SubmitScore(string walletAddress, float score, Dictionary<string, int> additionalData)
     {
+        // Prepare match data
+        Dictionary<string, object> matchData = new Dictionary<string, object>
+        {
+            { "address", walletAddress },
+            { "amount", score.ToString() }, // Ensure score is sent as a string to match API format
+            { "keys", new List<string>(additionalData.Keys) }, // Extract keys
+            { "values", new List<int>(additionalData.Values) }  // Extract values
+        };
+
         StartCoroutine(PostScore(matchData));
     }
 
@@ -30,11 +39,12 @@ public class ScoreUploader : MonoBehaviour
 
             if (webRequest.result == UnityWebRequest.Result.Success)
             {
-                Debug.Log("Score successfully submitted: " + webRequest.downloadHandler.text);
+                Debug.Log("✅ Score successfully submitted: " + webRequest.downloadHandler.text);
             }
             else
             {
-                Debug.LogError("Failed to submit score: " + webRequest.error);
+                Debug.LogError("❌ Failed to submit score: " + webRequest.error);
+                Debug.LogError("⚠️ Server response: " + webRequest.downloadHandler.text);
             }
         }
     }
