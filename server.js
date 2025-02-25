@@ -8,9 +8,9 @@ dotenv.config();
 const app = express();
 const port = 8000; // Studio's backend API runs on this port
 const provider = new JsonRpcProvider(process.env.ETH_NODE_URL);
-const privateKey = process.env.STUDIO_PRIVATE_KEY; // Private key for signing transactions
+const privateKey = process.env.STUDIO_PRIVATE_KEY;
 const wallet = new Wallet(privateKey, provider);
-const contractAddress = "0xYourMatchScoresContractAddressHere"; // Studio's contract address
+const contractAddress = process.env.MATCH_SCORES_CONTRACT;
 
 const matchScoresContract = new ethers.Contract(contractAddress, scores.abi, wallet);
 
