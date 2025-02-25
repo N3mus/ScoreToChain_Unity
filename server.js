@@ -1,13 +1,13 @@
-import express from "express";
-import { ethers, JsonRpcProvider, Wallet } from "ethers";
-import dotenv from "dotenv";
-import ScoresJSON from "./Scores.json" assert { type: "json" };
+const express = require("express");
+const { ethers } = require("ethers");
+const dotenv = require("dotenv");
+const ScoresJSON = require("./Scores.json");
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 8000; // Load PORT from .env, default to 8000
-const provider = new JsonRpcProvider(process.env.ETH_NODE_URL);
+const provider = new ethers.JsonRpcProvider(process.env.ETH_NODE_URL);
 const privateKey = process.env.STUDIO_PRIVATE_KEY; // Private key for signing transactions
 const contractAddress = process.env.MATCH_SCORES_CONTRACT; // Load contract address from .env
 
@@ -16,7 +16,7 @@ if (!privateKey || !contractAddress || !process.env.ETH_NODE_URL) {
     process.exit(1);
 }
 
-const wallet = new Wallet(privateKey, provider);
+const wallet = new ethers.Wallet(privateKey, provider);
 const scoresContract = new ethers.Contract(contractAddress, ScoresJSON.abi, wallet);
 
 // Middleware to parse JSON
