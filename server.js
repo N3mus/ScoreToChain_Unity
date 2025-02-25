@@ -6,12 +6,17 @@ import ScoresJSON from "./Scores.json" assert { type: "json" };
 dotenv.config();
 
 const app = express();
-const port = 8000; // Studio's backend API runs on this port
+const port = process.env.PORT || 8000; // Load PORT from .env, default to 8000
 const provider = new JsonRpcProvider(process.env.ETH_NODE_URL);
 const privateKey = process.env.STUDIO_PRIVATE_KEY; // Private key for signing transactions
-const wallet = new Wallet(privateKey, provider);
-const contractAddress = "0xYourMatchScoresContractAddressHere"; // Studio's contract address
+const contractAddress = process.env.MATCH_SCORES_CONTRACT; // Load contract address from .env
 
+if (!privateKey || !contractAddress || !process.env.ETH_NODE_URL) {
+    console.error("❌ Missing environment variables. Please check your .env file.");
+    process.exit(1);
+}
+
+const wallet = new Wallet(privateKey, provider);
 const scoresContract = new ethers.Contract(contractAddress, ScoresJSON.abi, wallet);
 
 // Middleware to parse JSON
@@ -40,19 +45,19 @@ app.post("/postMatchResults", async (req, res) => {
         const receipt = await tx.wait();
 
         if (receipt.status === 1) {
-            console.log(`Transaction successful! Hash: ${tx.hash}`);
+            console.log(`✅ Transaction successful! TX Hash: ${tx.hash}`);
             res.send({ message: "success", txHash: tx.hash });
         } else {
-            console.log("Transaction failed!", receipt);
+            console.log("❌ Transaction failed!", receipt);
             res.send({ message: "fail" });
         }
     } catch (error) {
-        console.error("Error submitting score:", error);
+        console.error("⚠️ Error submitting score:", error);
         res.status(500).send({ error: "Failed to submit score", details: error.message });
     }
 });
 
 // Start server
 app.listen(port, () => {
-    console.log(`Studio's API is running on http://localhost:${port}`);
+    console.log(`🚀 Studio's API is running on http://localhost:${port}`);
 });
