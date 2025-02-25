@@ -59,7 +59,7 @@ cd studio-backend
 
 ### 2. Install Dependencies
 ```bash
-npm install express ethers dotenv
+npm install
 ```
 
 ### 3. Place the ABI File
