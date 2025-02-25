@@ -20,18 +20,22 @@ app.use(express.json());
 app.post("/postMatchResults", async (req, res) => {
     console.log("Received request from Unity:", req.body);
 
-    const { address, gameid, amount } = req.body;
+    const { address, score, ...additionalData } = req.body;
 
-    if (!address || !gameid || !amount) {
-        return res.status(400).send({ error: "Missing parameters" });
+    if (!address || !score) {
+        return res.status(400).send({ error: "Missing required parameters: address and score are mandatory." });
     }
 
     try {
-        // Convert amount to wei
-        const amountInWei = ethers.parseEther(amount.toString());
+        // Convert score to wei (only if it's a currency-based score)
+        const scoreInWei = ethers.parseEther(score.toString());
+
+        // Convert additional data to key-value arrays for smart contract
+        const keys = Object.keys(additionalData);
+        const values = keys.map(key => Number(additionalData[key])); // Convert values to uint256
 
         // Send the transaction directly to the blockchain
-        const tx = await matchScoresContract.setScore(address, gameid, amountInWei);
+        const tx = await matchScoresContract.setScore(address, scoreInWei, keys, values);
         const receipt = await tx.wait();
 
         if (receipt.status === 1) {
