@@ -3,6 +3,7 @@ using UnityEngine.Networking;
 using System.Collections;
 using System.Text;
 using System.Collections.Generic;
+using Newtonsoft.Json; // Using JSON.NET for proper dictionary serialization
 
 public class ScoreUploader : MonoBehaviour
 {
@@ -15,8 +16,8 @@ public class ScoreUploader : MonoBehaviour
 
     private IEnumerator PostScore(Dictionary<string, object> matchData)
     {
-        // Convert dictionary to JSON
-        string jsonPayload = JsonUtility.ToJson(new Wrapper(matchData));
+        // Convert dictionary to JSON properly
+        string jsonPayload = JsonConvert.SerializeObject(matchData);
         byte[] postData = Encoding.UTF8.GetBytes(jsonPayload);
 
         using (UnityWebRequest webRequest = new UnityWebRequest(studioApiUrl, "POST"))
@@ -35,18 +36,6 @@ public class ScoreUploader : MonoBehaviour
             {
                 Debug.LogError("Failed to submit score: " + webRequest.error);
             }
-        }
-    }
-
-    // Wrapper class for Unity JSON serialization
-    [System.Serializable]
-    private class Wrapper
-    {
-        public Dictionary<string, object> data;
-
-        public Wrapper(Dictionary<string, object> dictionary)
-        {
-            this.data = dictionary;
         }
     }
 }
