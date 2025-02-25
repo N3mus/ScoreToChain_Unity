@@ -8,15 +8,15 @@ public class ScoreUploader : MonoBehaviour
 {
     private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
 
-    public void SubmitScore(Dictionary<string, object> scoreData)
+    public void SubmitScore(Dictionary<string, object> matchData)
     {
-        StartCoroutine(PostScore(scoreData));
+        StartCoroutine(PostScore(matchData));
     }
 
-    private IEnumerator PostScore(Dictionary<string, object> scoreData)
+    private IEnumerator PostScore(Dictionary<string, object> matchData)
     {
         // Convert dictionary to JSON
-        string jsonPayload = JsonUtility.ToJson(new Wrapper(scoreData));
+        string jsonPayload = JsonUtility.ToJson(new Wrapper(matchData));
         byte[] postData = Encoding.UTF8.GetBytes(jsonPayload);
 
         using (UnityWebRequest webRequest = new UnityWebRequest(studioApiUrl, "POST"))
@@ -38,7 +38,7 @@ public class ScoreUploader : MonoBehaviour
         }
     }
 
-    // Wrapper class to allow serialization of dictionaries
+    // Wrapper class for Unity JSON serialization
     [System.Serializable]
     private class Wrapper
     {
