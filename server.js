@@ -6,10 +6,11 @@ const ScoresJSON = require("./Scores.json");
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 8000; // Load PORT from .env, default to 8000
+const port = process.env.PORT || 8000;
+
 const provider = new ethers.JsonRpcProvider(process.env.ETH_NODE_URL);
-const privateKey = process.env.STUDIO_PRIVATE_KEY; // Private key for signing transactions
-const contractAddress = process.env.MATCH_SCORES_CONTRACT; // Load contract address from .env
+const privateKey = process.env.STUDIO_PRIVATE_KEY;
+const contractAddress = process.env.MATCH_SCORES_CONTRACT;
 
 if (!privateKey || !contractAddress || !process.env.ETH_NODE_URL) {
     console.error("❌ Missing environment variables. Please check your .env file.");
@@ -19,7 +20,6 @@ if (!privateKey || !contractAddress || !process.env.ETH_NODE_URL) {
 const wallet = new ethers.Wallet(privateKey, provider);
 const scoresContract = new ethers.Contract(contractAddress, ScoresJSON.abi, wallet);
 
-// Middleware to parse JSON
 app.use(express.json());
 
 app.post("/postMatchResults", async (req, res) => {
@@ -27,21 +27,24 @@ app.post("/postMatchResults", async (req, res) => {
 
     const { address, amount, keys, values } = req.body;
 
-    if (!address || !amount || !keys || !values) {
-        return res.status(400).send({ error: "Missing parameters" });
+    if (!address || typeof amount === "undefined" || !Array.isArray(keys) || !Array.isArray(values)) {
+        return res.status(400).send({ error: "Missing or invalid parameters" });
     }
+
     if (keys.length !== values.length) {
         return res.status(400).send({ error: "Keys and values arrays must be the same length" });
     }
 
     try {
-        // Convert amount to wei
-        const amountInWei = ethers.parseEther(amount.toString());
+        // Convert amount to int256 (BigInt, can be negative)
+        const parsedScore = ethers.toBigInt(amount); // Make sure `amount` can be negative, like -42
 
-        console.log(`Sending transaction: Player=${address}, Score=${amountInWei.toString()}, Data=${keys}`);
+        // Optional: convert string-number inputs to actual numbers for values
+        const parsedValues = values.map(v => BigInt(v));
 
-        // Send the transaction directly to the blockchain
-        const tx = await scoresContract.setScore(address, amountInWei, keys, values);
+        console.log(`Sending transaction: Player=${address}, Score=${parsedScore}, Data=${JSON.stringify(keys)}`);
+
+        const tx = await scoresContract.setScore(address, parsedScore, keys, parsedValues);
         const receipt = await tx.wait();
 
         if (receipt.status === 1) {
@@ -57,7 +60,6 @@ app.post("/postMatchResults", async (req, res) => {
     }
 });
 
-// Start server
 app.listen(port, () => {
     console.log(`🚀 Studio's API is running on http://localhost:${port}`);
 });
