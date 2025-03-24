@@ -7,22 +7,28 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
     struct Score {
-        uint256 score;
+        int256 score;
         uint256 timestamp;
-        mapping(string => uint256) additionalData; // Flexible additional match data
     }
 
     mapping(address => Score) public scores;
-    mapping(address => bool) public admins; // List of allowed studios (admins)
+    mapping(address => mapping(string => uint256)) public additionalMatchData;
+    mapping(address => bool) public admins;
 
     event ScoreUpdated(
         address indexed wallet,
-        uint256 score,
+        int256 score,
         uint256 timestamp,
         string[] keys,
         uint256[] values
     );
-    
+
+    event ScoreKeyValue(
+        address indexed wallet,
+        string key,
+        uint256 value
+    );
+
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
 
@@ -45,25 +51,26 @@ contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
         emit AdminRemoved(_admin);
     }
 
-    /// @notice Allows owner and admins to update scores
+    /// @notice Allows owner and admins to update scores (including negative values)
     function setScore(
         address _wallet,
-        uint256 _score,
+        int256 _score,
         string[] memory keys,
         uint256[] memory values
     ) external whenNotPaused {
         require(_wallet != address(0), "Invalid wallet address");
         require(msg.sender == owner() || admins[msg.sender], "Not authorized");
+        require(keys.length == values.length, "Mismatched key-value array length");
 
         // Create or update score entry
         Score storage userScore = scores[_wallet];
         userScore.score = _score;
         userScore.timestamp = block.timestamp;
 
-        // Store additional match data dynamically
-        require(keys.length == values.length, "Mismatched key-value array length");
+        // Store additional match data and emit individual events
         for (uint256 i = 0; i < keys.length; i++) {
-            userScore.additionalData[keys[i]] = values[i];
+            additionalMatchData[_wallet][keys[i]] = values[i];
+            emit ScoreKeyValue(_wallet, keys[i], values[i]); // 🔥 easier to decode on Etherscan
         }
 
         emit ScoreUpdated(_wallet, _score, block.timestamp, keys, values);
