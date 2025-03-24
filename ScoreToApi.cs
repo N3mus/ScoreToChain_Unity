@@ -3,21 +3,31 @@ using UnityEngine.Networking;
 using System.Collections;
 using System.Text;
 using System.Collections.Generic;
-using Newtonsoft.Json; // Using JSON.NET for proper dictionary serialization
+using Newtonsoft.Json; // JSON.NET for proper serialization
 
 public class ScoreUploader : MonoBehaviour
 {
-    private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // Update with the studio's backend API URL
+    private string studioApiUrl = "https://studio-backend.com/postMatchResults"; // ✅ Replace with your real backend URL
 
+    /// <summary>
+    /// Submits a score (can be negative) along with additional key-value match data.
+    /// </summary>
+    /// <param name="walletAddress">User wallet address</param>
+    /// <param name="score">Score as float (can be negative)</param>
+    /// <param name="additionalData">Dictionary with match keys and values</param>
     public void SubmitScore(string walletAddress, float score, Dictionary<string, int> additionalData)
     {
-        // Prepare match data
+        // Convert additionalData to separate lists
+        List<string> keys = new List<string>(additionalData.Keys);
+        List<int> values = new List<int>(additionalData.Values);
+
+        // Ensure we send the score as a string so it gets properly parsed as BigInt (int256) on backend
         Dictionary<string, object> matchData = new Dictionary<string, object>
         {
             { "address", walletAddress },
-            { "amount", score.ToString() }, // Ensure score is sent as a string to match API format
-            { "keys", new List<string>(additionalData.Keys) }, // Extract keys
-            { "values", new List<int>(additionalData.Values) }  // Extract values
+            { "amount", score.ToString() }, // 👈 Important: keep as string for BigInt parsing
+            { "keys", keys },
+            { "values", values }
         };
 
         StartCoroutine(PostScore(matchData));
@@ -25,7 +35,6 @@ public class ScoreUploader : MonoBehaviour
 
     private IEnumerator PostScore(Dictionary<string, object> matchData)
     {
-        // Convert dictionary to JSON properly
         string jsonPayload = JsonConvert.SerializeObject(matchData);
         byte[] postData = Encoding.UTF8.GetBytes(jsonPayload);
 
