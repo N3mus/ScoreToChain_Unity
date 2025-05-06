@@ -9,20 +9,19 @@ contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
     struct Score {
         uint256 score;
         uint256 timestamp;
-        mapping(string => uint256) additionalData; // Flexible additional match data
+        mapping(string => uint256) additionalData;
     }
 
-    mapping(address => Score) public scores;
-    mapping(address => bool) public admins; // List of allowed studios (admins)
+    mapping(bytes32 => Score) public scores;
+    mapping(address => bool)   public admins;
 
     event ScoreUpdated(
-        address indexed wallet,
-        uint256 score,
-        uint256 timestamp,
-        string[] keys,
-        uint256[] values
+        bytes32 indexed wallet,
+        uint256    score,
+        uint256    timestamp,
+        string[]   keys,
+        uint256[]  values
     );
-    
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
 
@@ -31,49 +30,42 @@ contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
         __Pausable_init();
     }
 
-    /// @notice Allows owner to add an admin (studio) that can update scores
     function addAdmin(address _admin) external onlyOwner {
         require(_admin != address(0), "Invalid address");
         admins[_admin] = true;
         emit AdminAdded(_admin);
     }
 
-    /// @notice Allows owner to remove an admin
     function removeAdmin(address _admin) external onlyOwner {
         require(admins[_admin], "Address is not an admin");
         admins[_admin] = false;
         emit AdminRemoved(_admin);
     }
 
-    /// @notice Allows owner and admins to update scores
     function setScore(
-        address _wallet,
-        uint256 _score,
+        bytes32       _wallet,   
+        uint256       _score,
         string[] memory keys,
         uint256[] memory values
     ) external whenNotPaused {
-        require(_wallet != address(0), "Invalid wallet address");
+        require(_wallet != bytes32(0), "Invalid wallet key");
         require(msg.sender == owner() || admins[msg.sender], "Not authorized");
+        require(keys.length == values.length, "Key/value length mismatch");
 
-        // Create or update score entry
-        Score storage userScore = scores[_wallet];
-        userScore.score = _score;
-        userScore.timestamp = block.timestamp;
-
-        // Store additional match data dynamically
-        require(keys.length == values.length, "Mismatched key-value array length");
-        for (uint256 i = 0; i < keys.length; i++) {
-            userScore.additionalData[keys[i]] = values[i];
+        Score storage s = scores[_wallet];
+        s.score     = _score;
+        s.timestamp = block.timestamp;
+        for (uint i = 0; i < keys.length; i++) {
+            s.additionalData[keys[i]] = values[i];
         }
 
         emit ScoreUpdated(_wallet, _score, block.timestamp, keys, values);
     }
 
-    function pause() public onlyOwner {
-        _pause();
-    }
+    function pause()   public onlyOwner { _pause(); }
+    function unpause() public onlyOwner { _unpause(); }
 
-    function unpause() public onlyOwner {
-        _unpause();
+    function ethToBytes32(address _eth) public pure returns (bytes32) {
+        return bytes32(uint256(uint160(_eth)));
     }
 }
