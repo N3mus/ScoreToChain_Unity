@@ -1,210 +1,117 @@
-{
-  "abi": [
+import json
+
+# Define the ABI
+abi = [
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "initialOwner",
-          "type": "address"
-        }
-      ],
-      "name": "initialize",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs": [{"internalType":"address","name":"initialOwner","type":"address"}],
+        "stateMutability":"nonpayable",
+        "type":"function",
+        "name":"initialize"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_admin",
-          "type": "address"
-        }
-      ],
-      "name": "addAdmin",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs":[{"internalType":"address","name":"_admin","type":"address"}],
+        "name":"addAdmin",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_admin",
-          "type": "address"
-        }
-      ],
-      "name": "removeAdmin",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs":[{"internalType":"address","name":"_admin","type":"address"}],
+        "name":"removeAdmin",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_wallet",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_score",
-          "type": "uint256"
-        },
-        {
-          "internalType": "string[]",
-          "name": "keys",
-          "type": "string[]"
-        },
-        {
-          "internalType": "uint256[]",
-          "name": "values",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "setScore",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs":[
+            {"internalType":"string","name":"_wallet","type":"string"},
+            {"internalType":"uint256","name":"_score","type":"uint256"},
+            {"internalType":"string[]","name":"keys","type":"string[]"},
+            {"internalType":"uint256[]","name":"values","type":"uint256[]"}
+        ],
+        "name":"setScore",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "inputs": [],
-      "name": "pause",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs":[],
+        "name":"pause",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "inputs": [],
-      "name": "unpause",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+        "inputs":[],
+        "name":"unpause",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "name": "scores",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "score",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "timestamp",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
+        "inputs":[{"internalType":"address","name":"","type":"address"}],
+        "name":"admins",
+        "outputs":[{"internalType":"bool","name":"","type":"bool"}],
+        "stateMutability":"view",
+        "type":"function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "name": "admins",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
+        "inputs":[],
+        "name":"owner",
+        "outputs":[{"internalType":"address","name":"","type":"address"}],
+        "stateMutability":"view",
+        "type":"function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_eth",
-          "type": "address"
-        }
-      ],
-      "name": "ethToBytes32",
-      "outputs": [
-        {
-          "internalType": "bytes32",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
+        "inputs":[{"internalType":"address","name":"newOwner","type":"address"}],
+        "name":"transferOwnership",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "bytes32",
-          "name": "wallet",
-          "type": "bytes32"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "score",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "timestamp",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string[]",
-          "name": "keys",
-          "type": "string[]"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256[]",
-          "name": "values",
-          "type": "uint256[]"
-        }
-      ],
-      "name": "ScoreUpdated",
-      "type": "event"
+        "inputs":[],
+        "name":"renounceOwnership",
+        "outputs":[],
+        "stateMutability":"nonpayable",
+        "type":"function"
     },
     {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "admin",
-          "type": "address"
-        }
-      ],
-      "name": "AdminAdded",
-      "type": "event"
+        "inputs":[],
+        "name":"paused",
+        "outputs":[{"internalType":"bool","name":"","type":"bool"}],
+        "stateMutability":"view",
+        "type":"function"
     },
     {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "admin",
-          "type": "address"
-        }
-      ],
-      "name": "AdminRemoved",
-      "type": "event"
+        "anonymous":False,
+        "inputs":[
+            {"indexed":False,"internalType":"string","name":"_wallet","type":"string"},
+            {"indexed":False,"internalType":"uint256","name":"score","type":"uint256"},
+            {"indexed":False,"internalType":"uint256","name":"timestamp","type":"uint256"},
+            {"indexed":False,"internalType":"string[]","name":"keys","type":"string[]"},
+            {"indexed":False,"internalType":"uint256[]","name":"values","type":"uint256[]"}
+        ],
+        "name":"ScoreUpdated",
+        "type":"event"
+    },
+    {
+        "anonymous":False,
+        "inputs":[{"indexed":True,"internalType":"address","name":"admin","type":"address"}],
+        "name":"AdminAdded",
+        "type":"event"
+    },
+    {
+        "anonymous":False,
+        "inputs":[{"indexed":True,"internalType":"address","name":"admin","type":"address"}],
+        "name":"AdminRemoved",
+        "type":"event"
     }
-  ]
-}
+]
+
+# Write to file
+file_path = '/mnt/data/Scores.json'
+with open(file_path, 'w') as f:
+    json.dump({"abi": abi}, f, indent=2)
+
+file_path
