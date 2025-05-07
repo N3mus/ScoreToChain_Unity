@@ -9,19 +9,20 @@ contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
     struct Score {
         uint256 score;
         uint256 timestamp;
-        mapping(string => uint256) additionalData;
+        mapping(string => uint256) additionalData; // Flexible additional match data
     }
 
-    mapping(bytes32 => Score) public scores;
-    mapping(address => bool)   public admins;
+    mapping(bytes32 => Score) private scores; // Internal key is hash of _wallet (as string)
+    mapping(address => bool) public admins;
 
     event ScoreUpdated(
-        bytes32 indexed wallet,
-        uint256    score,
-        uint256    timestamp,
-        string[]   keys,
-        uint256[]  values
+        string _wallet,
+        uint256 score,
+        uint256 timestamp,
+        string[] keys,
+        uint256[] values
     );
+
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
 
@@ -43,29 +44,33 @@ contract Scores is Initializable, OwnableUpgradeable, PausableUpgradeable {
     }
 
     function setScore(
-        bytes32       _wallet,   
-        uint256       _score,
+        string memory _wallet,
+        uint256 _score,
         string[] memory keys,
         uint256[] memory values
     ) external whenNotPaused {
-        require(_wallet != bytes32(0), "Invalid wallet key");
+        require(bytes(_wallet).length > 0, "Wallet ID cannot be empty");
         require(msg.sender == owner() || admins[msg.sender], "Not authorized");
-        require(keys.length == values.length, "Key/value length mismatch");
+        require(keys.length == values.length, "Mismatched key-value array length");
 
-        Score storage s = scores[_wallet];
-        s.score     = _score;
-        s.timestamp = block.timestamp;
-        for (uint i = 0; i < keys.length; i++) {
-            s.additionalData[keys[i]] = values[i];
+        bytes32 userKey = keccak256(abi.encodePacked(_wallet));
+
+        Score storage userScore = scores[userKey];
+        userScore.score = _score;
+        userScore.timestamp = block.timestamp;
+
+        for (uint256 i = 0; i < keys.length; i++) {
+            userScore.additionalData[keys[i]] = values[i];
         }
 
         emit ScoreUpdated(_wallet, _score, block.timestamp, keys, values);
     }
 
-    function pause()   public onlyOwner { _pause(); }
-    function unpause() public onlyOwner { _unpause(); }
+    function pause() public onlyOwner {
+        _pause();
+    }
 
-    function ethToBytes32(address _eth) public pure returns (bytes32) {
-        return bytes32(uint256(uint160(_eth)));
+    function unpause() public onlyOwner {
+        _unpause();
     }
 }
