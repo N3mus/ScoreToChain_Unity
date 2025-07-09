@@ -12,18 +12,16 @@ This repository provides code and documentation for integrating blockchain-based
 ---
 
 ## Repository Structure
-```
 
+```text
 / (root)
-├─ server.js               # Node.js backend API
-├─ Scores.json             # ABI for the Scores smart contract
-├─ scores.sol              # Solidity source (for reference)
-├─ ScoreToApi.cs           # Unity batching & upload component
-├─ Unreal                  # Unreal header & source for batching & upload
-├─ README.md               # This file
-└─ .env                    # Environment variables (example in repo)
-
-````
+├─ server.js             # Node.js backend API
+├─ Scores.json           # ABI for the Scores smart contract
+├─ scores.sol            # Solidity source (for reference)
+├─ ScoreToApi.cs         # Unity batching & upload component
+├─ Unreal                # Unreal header & source for batching & upload
+├─ README.md             # This file
+└─ .env                  # Environment variables (not in repo)
 
 ---
 
