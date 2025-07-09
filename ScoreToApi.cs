@@ -58,39 +58,46 @@ public class ScoreUploader : MonoBehaviour
     public void SubmitScores(
         List<string> walletAddresses,
         List<long> scores,
-        List<Dictionary<string, int>> additionalDataList = null
+        List<Dictionary<string,int>> additionalDataList = null
     )
     {
-        if (walletAddresses == null || scores == null ||
-            walletAddresses.Count != scores.Count ||
+        if (walletAddresses.Count != scores.Count ||
             (additionalDataList != null && additionalDataList.Count != walletAddresses.Count))
         {
-            Debug.LogError("Invalid parameters for SubmitScores");
+            Debug.LogError("Invalid params");
             return;
         }
-
-        // Build metadata arrays
-        var keysArray = new List<List<string>>();
+    
+        // Build metadata arrays so outer length always matches wallets.Count
+        var keysArray   = new List<List<string>>();
         var valuesArray = new List<List<int>>();
-        if (additionalDataList != null)
+    
+        for (int i = 0; i < walletAddresses.Count; i++)
         {
-            foreach (var data in additionalDataList)
+            if (additionalDataList != null)
             {
-                keysArray.Add(new List<string>(data.Keys));
-                valuesArray.Add(new List<int>(data.Values));
+                var meta = additionalDataList[i];
+                keysArray.Add(new List<string>(meta.Keys));
+                valuesArray.Add(new List<int>(meta.Values));
+            }
+            else
+            {
+                keysArray.Add(new List<string>());  // empty
+                valuesArray.Add(new List<int>());   // empty
             }
         }
-
+    
         var payload = new Dictionary<string, object>
         {
             { "wallets", walletAddresses },
-            { "scores", scores },
-            { "keys", keysArray },
-            { "values", valuesArray }
+            { "scores",  scores },
+            { "keys",    keysArray },
+            { "values",  valuesArray }
         };
-
+    
         StartCoroutine(PostPayload(payload));
     }
+
 
     private IEnumerator PostPayload(Dictionary<string, object> payload)
     {
