@@ -1,128 +1,166 @@
-# Studio Backend API & Unity Integration for Blockchain Score Submission
+```markdown
+# Studio Backend API & Game Integration for Blockchain Score Submission
 
 ## Overview
-This repository provides the necessary code and documentation for integrating blockchain-based score submissions in your game. It is designed for studios to host their own backend API and integrate with Unity to send player scores and match metadata directly to the blockchain.
+This repository provides code and documentation for integrating blockchain-based score submissions in your game. It includes:
 
-**Key Components:**
-- **Backend API (`server.js`)**: A Node.js Express server that signs and submits transactions to the blockchain using the provided smart contract.
-- **Unity Integration (`ScoreToApi.cs`)**: A Unity C# script that sends player scores and additional match data from the game client to the studio's backend API.
-- **Smart Contract Reference (`scores.sol`)**: The Solidity smart contract that defines how scores are stored and updated. *Note: We will provide the smart contract address separately; this file is for reference.*
+- **Backend API (`server.js`)**: A Node.js Express server that batches and submits transactions to the blockchain via the `Scores` smart contract.
+- **Unity Integration (`ScoreToApi.cs`)**: A Unity C# script that logs, queues, and batches player scores (and metadata) to the backend API.
+- **Unreal Integration (`ScoreManagerUnreal.h/.cpp`)**: An Unreal C++ module/component that mirrors the Unity batching, logging, and HTTP submission.
+- **Smart Contract Reference (`scores.sol`)**: The Solidity contract defining how scores and metadata are stored on-chain.
 
 ---
 
 ## Repository Structure
-- `server.js` – The backend API that receives score submissions, signs transactions, and submits them to the blockchain.
-- `ScoreToApi.cs` – The Unity C# script used to send player scores and match data to the backend API.
-- `Scores.json` – The ABI file for the Scores smart contract.
-- `scores.sol` – The Solidity smart contract (provided for reference).
-- `.env` – Environment file (not included in the repository) that contains sensitive configuration variables.
+```
+
+/ (root)
+├─ server.js               # Node.js backend API
+├─ Scores.json             # ABI for the Scores smart contract
+├─ scores.sol              # Solidity source (for reference)
+├─ ScoreToApi.cs           # Unity batching & upload component
+├─ Unreal                  # Unreal header & source for batching & upload
+├─ README.md               # This file
+└─ .env                    # Environment variables (not in repo)
+
+````
 
 ---
 
 ## Prerequisites
-- **Node.js** (v16+ recommended) and NPM/Yarn.
-- **Unity** with JSON.NET (Newtonsoft.Json) installed (via Unity Package Manager or as a DLL).
-- A deployed **Scores** smart contract on an Ethereum-compatible blockchain (e.g., Moonbeam).
-- A wallet with sufficient funds for gas fees (for testing, use a test wallet).
-- A properly configured `.env` file (see below).
+- **Node.js** (v16+)
+- **Unity** (with JSON.NET / Newtonsoft.Json)
+- **Unreal Engine** (with HTTP & JSON modules)
+- Deployed **Scores** smart contract on an Ethereum-compatible chain
+- A wallet with funds for gas fees (testnet recommended)
+- `.env` file configured (see below)
 
 ---
 
 ## Environment Setup
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the project root:
 
 ```ini
-# Blockchain RPC URL (e.g., Moonbeam)
+# Blockchain RPC URL
 ETH_NODE_URL=https://rpc.api.moonbeam.network
 
-# Studio's Private Key (use a test key for development)
+# Studio's Private Key (test key for development)
 STUDIO_PRIVATE_KEY=0xYourPrivateKeyHere
 
-# Contract address for the Match Scores contract (provided separately)
+# Deployed contract address
 MATCH_SCORES_CONTRACT=0xYourMatchScoresContractAddressHere
 
-# Server Port (Optional: Change if running multiple services)
+# Backend port (optional)
 PORT=8000
-```
+````
 
-> **Security Note:** Never expose your real private key in public repositories. Use environment variables to keep sensitive data secure.
+> **Security:** Never commit real private keys. Use environment variables.
 
 ---
 
 ## Installation
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/your-repo/studio-backend.git
-cd studio-backend
+1. **Clone**
+
+   ```bash
+   git clone https://github.com/your-repo/studio-backend.git
+   cd studio-backend
+   ```
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+3. **Place ABI**
+   Ensure `Scores.json` is in the root directory.
+
+---
+
+## Backend: `server.js`
+
+The Express server exposes:
+
+* **Endpoint:** `POST /postMatchResults` accepts a **batch** payload:
+
+  ```json
+  {
+    "wallets": ["0x..", ...],
+    "scores":  [123, 456, ...],
+    "keys":    [["k1","k2"], ...],
+    "values":  [[10,20], ...]
+  }
+  ```
+* **Validation:** checks array lengths, converts scores to BigInt.
+* **Contract call:**
+
+  ```js
+  await scoresContract.setScores(
+    wallets,
+    scoreBigInts,
+    keysArg,
+    valsArg
+  );
+  ```
+
+---
+
+## Unity: `ScoreToApi.cs`
+
+* **ScoreEntry** model with `wallet`, `score`, and `meta`.
+* **ScoreQueue**: in-memory queue + persistent `scores.log` under `Application.persistentDataPath`.
+* **ScoreUploader**: sends batched JSON to the backend.
+* **ScoreManager**: enqueues entries, flushes when batch size (default 50) is reached, every minute, and on application quit.
+
+Attach `ScoreManager` to a GameObject and call:
+
+```csharp
+ScoreManager.Instance.RecordScore(
+    "0x123…", 
+    100, 
+    new Dictionary<string,int>{{"kills",5}}
+);
 ```
 
-### 2. Install Dependencies
-```bash
-npm install
-```
+---
 
-### 3. Place the ABI File
-Ensure that `Scores.json` (the ABI file for the Scores contract) is placed in the root directory.
+## Unreal: `ScoreManagerUnreal` (h/.cpp)
+
+* **FScoreEntry** USTRUCT for data.
+* **UScoreQueueComponent**: in-memory queue + saves `Saved/scores.log`.
+* **AScoreManager** Actor:
+
+  * `RecordScore(...)` to enqueue.
+  * Timed and size-based `FlushNow()` to build JSON and POST to `/postMatchResults`.
+  * Logs successes/failures in the output log.
+
+Place the files in your `Source/` folder, add the module to your build, and spawn or place `AScoreManager` in your level.
 
 ---
 
-## How `server.js` Works
-The `server.js` file implements an Express server that listens on a specified port (default is `8000`) and exposes a POST endpoint `/postMatchResults`. It performs the following tasks:
+## Smart Contract Reference: `scores.sol`
 
-- **Environment Variables:**  
-  Loads the blockchain RPC URL, studio's private key, contract address, and server port from the `.env` file.
+Defines the `Scores` contract with:
 
-- **Blockchain Connection:**  
-  Connects to the blockchain using the `ethers` library and creates a wallet instance using the private key.
+* `setScores(address[] wallets, uint256[] scores_, string[][] keys, uint256[][] values)`
+* Batch storage & events: `ScoreUpdated(address,uint256,uint256,string[],uint256[])`
 
-- **Smart Contract Interaction:**  
-  Connects to the Scores smart contract using its ABI (from `Scores.json`) and the contract address provided via the `.env` file.
-
-- **API Endpoint (`/postMatchResults`)**:  
-  Expects a JSON payload with the following parameters:
-  - `address` (string): The player's wallet address.
-  - `amount` (string): The score to record (sent as a string and converted to Wei).
-  - `keys` (array): An array of strings representing additional match data keys.
-  - `values` (array): An array of integers corresponding to each key.
-  
-  It validates the payload, converts the score to Wei, calls the smart contract's `setScore` function, waits for the transaction to be mined, and returns the transaction hash upon success.
-
----
-
-## How `ScoreToApi.cs` Works
-The `ScoreToApi.cs` file is a Unity C# script that sends player score data along with additional match metadata to the studio's backend API.
-
-**Functionality:**
-- **Data Preparation:**  
-  Accepts a player's wallet address, a score (as a float), and a dictionary containing additional match data (e.g., kills, assists, time played). It constructs a dictionary that includes:
-  - `address`: The player's wallet address.
-  - `amount`: The score converted to a string (for API compatibility).
-  - `keys`: An array of strings (extracted from the additional data keys).
-  - `values`: An array of integers (extracted from the additional data values).
-
-- **JSON Serialization:**  
-  Uses JSON.NET (Newtonsoft.Json) to properly serialize the data into JSON format.
-
-- **POST Request:**  
-  Sends a POST request to the backend API endpoint (`/postMatchResults`) with the JSON payload. Logs the server response to help with debugging.
-
----
-
-## Smart Contract Reference
-The `scores.sol` file is provided as a reference and defines the structure and functionality for storing player scores and additional match data on the blockchain. The key function is `setScore`, which updates a player's score along with flexible metadata.
+Use this file to verify against your deployed address.
 
 ---
 
 ## Final Notes
-- The studio's backend (`server.js`) expects the smart contract address to be provided via the `.env` file. We will provide the smart contract address separately.
-- The `scores.sol` file is included as a reference and should match the deployed smart contract.
-- Update the API URL in `ScoreToApi.cs` to match the actual endpoint where your studio backend is hosted.
-- This setup allows for secure and scalable blockchain score submissions from Unity to the blockchain via your studio’s backend.
+
+* Update API URLs in Unity/Unreal to your hosted backend.
+* Adjust `BATCH_SIZE` and `FlushInterval` as needed for your game’s throughput.
+* Ensure `.env` is secure and never committed.
 
 ---
 
-## Contact & Support
-For questions or issues, please open a GitHub issue in this repository or contact the maintainers directly.
+## Support
 
-Happy coding and blockchain integration! 🚀
+Open an issue or contact the maintainers for any questions.
+
+Happy coding! 🚀
+
+```
+```
