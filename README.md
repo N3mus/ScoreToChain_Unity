@@ -21,7 +21,7 @@ This repository provides code and documentation for integrating blockchain-based
 ├─ ScoreToApi.cs           # Unity batching & upload component
 ├─ Unreal                  # Unreal header & source for batching & upload
 ├─ README.md               # This file
-└─ .env                    # Environment variables (not in repo)
+└─ .env                    # Environment variables (example in repo)
 
 ````
 
