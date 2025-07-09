@@ -1,109 +1,237 @@
-// ScoreUploader.h
-
+// ScoreManagerUnreal.h
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
-#include "ScoreUploader.generated.h"
+#include "HttpModule.h"
+#include "Interfaces/IHttpResponse.h"
+#include "Json.h"
+#include "JsonUtilities.h"
+#include "ScoreManagerUnreal.generated.h"
 
-UCLASS()
-class YOURGAME_API AScoreUploader : public AActor
+// --- Data model for a single score entry ---
+USTRUCT(BlueprintType)
+struct FScoreEntry
+{
+    GENERATED_BODY()
+
+    UPROPERTY()
+    FString Wallet;
+
+    UPROPERTY()
+    int64 Score;
+
+    UPROPERTY()
+    TMap<FString, int32> Meta;
+};
+
+// --- Component: in-memory queue + persistent log ---
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
+class YOURGAME_API UScoreQueueComponent : public UActorComponent
 {
     GENERATED_BODY()
 
 public:
-    AScoreUploader();
+    void Enqueue(const FScoreEntry& Entry)
+    {
+        Pending.Add(Entry);
+        FString Line = FDateTime::UtcNow().ToString() + TEXT(" ") + Entry.Wallet + TEXT(" → ") + FString::FromInt(Entry.Score) + TEXT(" pts\n");
+        FFileHelper::SaveStringToFile(Line, *GetLogPath(), FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), EFileWrite::FILEWRITE_Append);
+    }
 
-    UFUNCTION(BlueprintCallable, Category = "Score Upload")
-    void SubmitScore(const FString& WalletAddress, float Score, const TMap<FString, int32>& AdditionalData);
+    int32 GetPendingCount() const { return Pending.Num(); }
+
+    TArray<FScoreEntry> DequeueAll()
+    {
+        TArray<FScoreEntry> Batch = Pending;
+        Pending.Empty();
+        return Batch;
+    }
 
 private:
+    // Where to store the log
+    FString GetLogPath() const
+    {
+        return FPaths::ProjectSavedDir() / TEXT("scores.log");
+    }
+
+    // Pending queue
+    TArray<FScoreEntry> Pending;
+};
+
+// --- Actor: manages queuing, batching, HTTP flush ---
+UCLASS()
+class YOURGAME_API AScoreManager : public AActor
+{
+    GENERATED_BODY()
+
+public:
+    AScoreManager();
+
+    // Record a single score entry
+    UFUNCTION(BlueprintCallable, Category="Score Upload")
+    void RecordScore(const FString& WalletAddress, int64 Score, const TMap<FString,int32>& AdditionalData);
+
+protected:
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+private:
+    // Batch size trigger
+    UPROPERTY(EditAnywhere, Category="Batch")
+    int32 BatchSize = 50;
+
+    // Flush interval (seconds)
+    UPROPERTY(EditAnywhere, Category="Batch")
+    float FlushInterval = 60.0f;
+
+    // Endpoint URL
+    UPROPERTY(EditAnywhere, Category="Config")
+    FString ApiUrl = TEXT("https://studio-backend.com/postMatchResults");
+
+    // Components
+    UPROPERTY()
+    UScoreQueueComponent* QueueComp;
+
+    // Timer handle for periodic flush
+    FTimerHandle TimerHandle;
+
+    // Flush now
+    void FlushNow();
+    void PeriodicFlush();
+
+    // HTTP callback
     void OnResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 };
 
 
-// ScoreUploader.cpp
+// ScoreManagerUnreal.cpp
+#include "ScoreManagerUnreal.h"
+#include "TimerManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
-#include "ScoreUploader.h"
-#include "HttpModule.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
-#include "Json.h"
-#include "JsonUtilities.h"
-
-AScoreUploader::AScoreUploader()
+AScoreManager::AScoreManager()
 {
     PrimaryActorTick.bCanEverTick = false;
+    QueueComp = CreateDefaultSubobject<UScoreQueueComponent>(TEXT("ScoreQueue"));
 }
 
-void AScoreUploader::SubmitScore(const FString& WalletAddress, float Score, const TMap<FString, int32>& AdditionalData)
+void AScoreManager::BeginPlay()
 {
-    // Prepare URL
-    FString StudioApiUrl = TEXT("https://studio-backend.com/postMatchResults");
+    Super::BeginPlay();
+    // Start periodic flush
+    GetWorldTimerManager().SetTimer(TimerHandle, this, &AScoreManager::PeriodicFlush, FlushInterval, true);
+}
 
-    // Create JSON object
-    TSharedPtr<FJsonObject> JsonObject = MakeShareable(new FJsonObject);
-    JsonObject->SetStringField("address", WalletAddress);
-    JsonObject->SetStringField("amount", FString::SanitizeFloat(Score)); // Ensure score is sent as a string
-     
-    // Convert AdditionalData keys and values into JSON arrays
-    TArray<TSharedPtr<FJsonValue>> JsonKeys;
-    TArray<TSharedPtr<FJsonValue>> JsonValues;
+void AScoreManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    FlushNow();
+    GetWorldTimerManager().ClearTimer(TimerHandle);
+    Super::EndPlay(EndPlayReason);
+}
 
-    for (const TPair<FString, int32>& Pair : AdditionalData)
+void AScoreManager::RecordScore(const FString& WalletAddress, int64 Score, const TMap<FString,int32>& AdditionalData)
+{
+    FScoreEntry Entry;
+    Entry.Wallet = WalletAddress;
+    Entry.Score = Score;
+    Entry.Meta = AdditionalData;
+
+    QueueComp->Enqueue(Entry);
+    UE_LOG(LogTemp, Log, TEXT("Enqueued score: %s → %lld pts"), *WalletAddress, Score);
+
+    if (QueueComp->GetPendingCount() >= BatchSize)
     {
-        JsonKeys.Add(MakeShareable(new FJsonValueString(Pair.Key)));
-        JsonValues.Add(MakeShareable(new FJsonValueNumber(Pair.Value)));
+        FlushNow();
+    }
+}
+
+void AScoreManager::PeriodicFlush()
+{
+    if (QueueComp->GetPendingCount() > 0)
+    {
+        FlushNow();
+    }
+}
+
+void AScoreManager::FlushNow()
+{
+    TArray<FScoreEntry> Batch = QueueComp->DequeueAll();
+    if (Batch.Num() == 0) return;
+
+    // Build JSON
+    TSharedPtr<FJsonObject> JsonRoot = MakeShareable(new FJsonObject);
+    TArray<TSharedPtr<FJsonValue>> JsonWallets;
+    TArray<TSharedPtr<FJsonValue>> JsonScores;
+    TArray<TSharedPtr<FJsonValue>> JsonKeysArr;
+    TArray<TSharedPtr<FJsonValue>> JsonValsArr;
+
+    // Prepare 2D arrays
+    TArray<TArray<TSharedPtr<FJsonValue>>> Keys2D;
+    TArray<TArray<TSharedPtr<FJsonValue>>> Vals2D;
+
+    for (auto& E : Batch)
+    {
+        JsonWallets.Add(MakeShareable(new FJsonValueString(E.Wallet)));
+        JsonScores.Add( MakeShareable(new FJsonValueNumber((double)E.Score)) );
+
+        // Inner arrays
+        TArray<TSharedPtr<FJsonValue>> KeysInner;
+        TArray<TSharedPtr<FJsonValue>> ValsInner;
+        for (auto& Pair : E.Meta)
+        {
+            KeysInner.Add(MakeShareable(new FJsonValueString(Pair.Key)));
+            ValsInner.Add(MakeShareable(new FJsonValueNumber(Pair.Value)));
+        }
+        Keys2D.Add(KeysInner);
+        Vals2D.Add(ValsInner);
     }
 
-    JsonObject->SetArrayField("keys", JsonKeys);
-    JsonObject->SetArrayField("values", JsonValues);
+    // Serialize 2D arrays
+    TArray<TSharedPtr<FJsonValue>> KeysOuter;
+    TArray<TSharedPtr<FJsonValue>> ValsOuter;
+    for (int32 i = 0; i < Keys2D.Num(); i++)
+    {
+        KeysOuter.Add( MakeShareable(new FJsonValueArray(Keys2D[i])) );
+        ValsOuter.Add( MakeShareable(new FJsonValueArray(Vals2D[i])) );
+    }
 
-    // Convert JSON object to string
-    FString JsonOutput;
-    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonOutput);
-    FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+    JsonRoot->SetArrayField(TEXT("wallets"), JsonWallets);
+    JsonRoot->SetArrayField(TEXT("scores"), JsonScores);
+    JsonRoot->SetArrayField(TEXT("keys"), KeysOuter);
+    JsonRoot->SetArrayField(TEXT("values"), ValsOuter);
 
-    // Create HTTP request
+    // Convert to string
+    FString Output;
+    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Output);
+    FJsonSerializer::Serialize(JsonRoot.ToSharedRef(), Writer);
+
+    // Create and send request
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-    Request->SetURL(StudioApiUrl);
-    Request->SetVerb("POST");
-    Request->SetHeader("Content-Type", "application/json");
-    Request->SetContentAsString(JsonOutput);
-    Request->OnProcessRequestComplete().BindUObject(this, &AScoreUploader::OnResponseReceived);
+    Request->SetURL(ApiUrl);
+    Request->SetVerb(TEXT("POST"));
+    Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+    Request->SetContentAsString(Output);
+    Request->OnProcessRequestComplete().BindUObject(this, &AScoreManager::OnResponseReceived);
     Request->ProcessRequest();
+
+    UE_LOG(LogTemp, Log, TEXT("Flushing %d scores to API"), Batch.Num());
 }
 
-void AScoreUploader::OnResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+void AScoreManager::OnResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
-    if (bWasSuccessful && Response.IsValid())
+    if (bWasSuccessful && Response.IsValid() && Response->GetResponseCode() == 200)
     {
-        UE_LOG(LogTemp, Log, TEXT("✅ Score successfully submitted: %s"), *Response->GetContentAsString());
+        UE_LOG(LogTemp, Log, TEXT("✅ Batch submission succeeded: %s"), *Response->GetContentAsString());
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("❌ Failed to submit score!"));
+        UE_LOG(LogTemp, Error, TEXT("❌ Batch submission failed: HTTP %d"), Response.IsValid() ? Response->GetResponseCode() : -1);
         if (Response.IsValid())
         {
-            UE_LOG(LogTemp, Error, TEXT("⚠️ Server response: %s"), *Response->GetContentAsString());
+            UE_LOG(LogTemp, Error, TEXT("Server: %s"), *Response->GetContentAsString());
         }
     }
 }
-
-
-
-
-🚀 How to Use in Unreal
-Attach ScoreUploader to an Actor in your Unreal scene.
-Call SubmitScore() from Blueprints or C++:
-
-AScoreUploader* Uploader = GetWorld()->SpawnActor<AScoreUploader>();
-TMap<FString, int32> AdditionalData;
-AdditionalData.Add("gameMode", 1);
-AdditionalData.Add("difficulty", 3);
-Uploader->SubmitScore("0x1234567890abcdef1234567890abcdef12345678", 10.0f, AdditionalData);
-
-
-Check Output Log (Window > Developer Tools > Output Log) for debug messages.
-
-
